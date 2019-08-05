@@ -1,0 +1,244 @@
+---
+title: "HarvardX - Individual report"
+author: "Nguyen Bao Long"
+date: "8/4/2019"
+output:
+  pdf_document:
+    toc: true
+    section_number: true
+  html_document:
+    df_print: paged
+    code_folding: hide
+---
+
+\newpage
+
+# Setting up environment
+
+```{r setup, include=FALSE}
+# set up environment, standardize figure output
+
+options(tinytex.verbose = TRUE)
+knitr::opts_chunk$set(echo = TRUE, fig.height = 3.5, fig.width = 5,
+                      fig.align = "center")
+```
+
+```{r}
+if(!require(keras)) install.packages("keras", 
+                   repos = "http://cran.us.r-project.org", 
+                   dependencies = TRUE)
+
+if(!require(matrixStats)) install.packages("matrixStats", 
+                   repos = "http://cran.us.r-project.org", 
+                   dependencies = TRUE)
+
+if(!require(grDevices)) install.packages("grDevices", 
+                   repos = "http://cran.us.r-project.org", 
+                   dependencies = TRUE)
+
+if(!require(gridExtra)) install.packages("gridExtra", 
+                   repos = "http://cran.us.r-project.org", 
+                   dependencies = TRUE)
+
+if(!require(tidyverse)) install.packages("tidyverse", 
+                   repos = "http://cran.us.r-project.org", 
+                   dependencies = TRUE)
+```
+
+
+```{r import library, include=FALSE}
+library(tidyverse)
+library(caret)
+library(matrixStats)
+library(grDevices)
+library(gridExtra)
+library(keras)
+library(RC)
+```
+
+
+\newpage
+
+**Abstract**
+
+# **Introduction**
+
+## **Background**
+
+![](http://playagricola.com/Kaggle/KaggleMNISThist3.png)
+
+
+## **Project goals**
+
+
+## **Data preparation**
+
+```{r}
+# download raw data from my github repo
+
+url_train <- url("https://raw.githubusercontent.com/billynguyenlss/mnist/master/train.csv")
+mnist <- read.csv(url_train)
+
+# reduce size to 6000 rows
+set.seed(1)
+
+mnist_small <- sample_frac(mnist, size = 0.2)
+
+# create train and test set
+set.seed(1)
+index <- createDataPartition(mnist_small$label, times = 1, p = 0.6, list = F)
+
+edx <- mnist_small[index,]
+validation <- mnist_small[-index,]
+```
+
+
+## **Data overview**
+
+```{r}
+dim(edx)
+```
+
+```{r}
+dim(validation)
+```
+
+
+```{r}
+# separate edx set to data names 'x' and results names 'y'
+
+x <- edx[,-1]
+y <- edx[,1]
+
+# convert x to matrix
+x <- matrix(as.numeric(unlist(x)), nrow = nrow(x))
+y <- factor(y)
+```
+
+
+```{r}
+# separate validation set to data names 'x' and results names 'y'
+
+x_test <- validation[,-1]
+y_test <- validation[,1]
+
+# convert x to matrix
+x_test <- matrix(as.numeric(unlist(x_test)), nrow = nrow(x_test))
+y_test <- factor(y_test)
+```
+
+
+```{r}
+matrix.rotate <- function(img) { 
+  img <- matrix(img, nrow=28L, byrow=T)
+  t(apply(img, 2, rev))
+}
+mnist.image <- function(img){
+  l = length(img)
+  rc = round(sqrt(l),0)
+  par(mfcol = c(rc, rc), mar=c(0.1,0.1,1,0.1))
+  for (i in img){
+    image(matrix.rotate(x[i,]),
+          col = gray.colors(33), 
+          axes = F, 
+          main = paste(y[i]))
+  }
+}
+```
+
+```{r}
+mnist.image(seq(1,16,1))
+```
+
+
+# **Data exploratory analysis**
+
+Reduce the near zero variables.
+
+```{r}
+nzv <- nearZeroVar(x)
+par(mfrow = c(1,1))
+image(matrix(1:784 %in% nzv, 28, 28),
+      col = gray.colors(33))
+```
+
+Ink consumption:
+
+```{r}
+avg <- rowMeans(x)
+
+data_frame(labels = as.factor(y), row_averages = avg) %>% 
+  qplot(labels, row_averages, data = ., geom = "boxplot", fill = labels) 
+```
+
+```{r}
+edx %>% mutate(label = factor(label)) %>%
+  ggplot(aes(label, fill = label)) +
+  geom_bar() +
+  theme_classic()
+```
+
+
+```{r}
+col_index <- setdiff(1:ncol(x), nzv)
+length(col_index)
+
+x2 <- edx[,-1]
+x2 <- x2[,col_index]
+
+x_test_2 <- validation[,-1]
+x_test_2 <- x_test_2[,col_index]
+```
+
+# **Modeling**
+
+```{r}
+control = trainControl(method = "cv",
+                      number = 5,
+                      p = 0.8)
+set.seed(2019)
+fx_knn <- train(x2,y,
+               method = "knn",
+               trControl = control)
+
+fx_knn$results$Accuracy
+```
+
+```{r}
+x3 <- x2
+x3[x3 < 255/3] <- 0
+x3[x3>=255/3] <- 1
+```
+
+The accuracy of original edx dataset is 0.9395.
+```{r}
+set.seed(2019)
+fx_svm <- train(edx[,-1],y,
+               method = "svmRadial",
+               trControl = control)
+
+fx_svm$results$Accuracy
+```
+
+
+```{r}
+set.seed(2019)
+fx_one <- train(sweep(x2, 2, colMeans(x2)),
+                y,
+               method = "svmRadial",
+               trControl = control)
+
+fx_one$results$Accuracy
+```
+
+
+
+# **Results & discussion**
+
+
+
+# **Conclusion**
+
+
+# **Reference**
+
